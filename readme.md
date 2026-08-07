@@ -4,10 +4,16 @@ This Discord Bot was made in 2024 as a hobby, using Google's Gemini AI to chat w
 The Bot is told to respond in portuguese, but it can also talk other languages, since it's Gemini AI.
 
 ## How to use
-Idk, imma figure it out n then ima put it here
+
+First of all, create an .env file with the following lines:
+
+```
+GOOGLE_API_KEY = "your_api_key"
+CLEBER_KEY = "your_discord_bot_key"
+```
 
 ### 1. Run the following commands on your terminal
 
-1. pip install google.genai
-2. pip install dotenv
-3. pip install discord
+1. `pip install google.genai`
+2. `pip install dotenv`
+3. `pip install discord`
