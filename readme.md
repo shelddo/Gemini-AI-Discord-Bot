@@ -5,3 +5,9 @@ The Bot is told to respond in portuguese, but it can also talk other languages, 
 
 ## How to use
 Idk, imma figure it out n then ima put it here
+
+### 1. Run the following commands on your terminal
+
+1. pip install google.genai
+2. pip install dotenv
+3. pip install discord
