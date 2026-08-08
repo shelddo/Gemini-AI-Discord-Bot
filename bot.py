@@ -10,31 +10,65 @@ import asyncio
 import discord.ext
 load_dotenv()
 
-BOT_TOKEN = os.environ.get("CLEBER_KEY") 
+# BOT AND GOOGLE API KEYS
+BOT_TOKEN = os.environ.get("BOT_TOKEN") 
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY") 
-CHANNEL_ID = 1019366631488634922 #716060980630782045
 
-startConvo = False
+# BOT CONFIGURATION
+MODEL = "gemini-3.1-flash-lite"
+BOT_NAME = "Cleber"
+BOT_INSTRUCTIONS = f'Seu nome é {BOT_NAME}, você é um bot do Discord, você foi feito apenas para conversar com as pessoas,' \
+" então responda-as num linguajar mais xulo e casual, usando gírias e palavrões (NA MEDIDA). Evite disseminar ódio gratuito e discursos de ódio."
+CHANNEL_ID = 1019366631488634922 # PREDEFINED CHANNEL ID, CHANGES WHEN SOMEONE TALKS TO THE BOT
+
+startConvo = False # checks if the bot is chatting or not
+
+print(f"Discord.py version: {discord.__version__}")
+
+
+## Bot initialization
 
 intents = discord.Intents.all()
 intents.message_content = True
-
-print(discord.__version__)
-
 client = commands.Bot(command_prefix='!', intents=intents)
 client.activity = discord.Activity(type=discord.ActivityType.watching, name="o chat")
 
 @client.event
 async def on_ready():
-    print(f'We have logged in as {client.user}')
+    print(f'Logado como {client.user}')
 
-print(discord.Interaction.permissions)
+## Bot initialization end
+
+## Bot tools (commands that the bot can execute)
 
 def kickUser(guild_id:int, requesting_user:int, target_id:int, really:bool=False):
     if really == False:
         return "Para continuar, necessário que o úsuario que solicitou confirme a operação, pergunte se ele tem certeza e execute o comando."
     else:
         asyncio.create_task(kick(int(guild_id), int(requesting_user), int(target_id), really))
+
+def deleteTextChannel(channel_id:int):
+    print(channel_id)
+    asyncio.create_task(textChannelDelete(int(channel_id)))
+
+def createTextChannel(server_id:int, nome_canal:str):
+    print(f"Criou canal {nome_canal}, no servidor de id {server_id}")
+    print(server_id)
+    asyncio.create_task(textChannelCreate(int(server_id), nome_canal))
+
+def clearMsgs(amount:int=5):
+    ctx = client.get_channel(CHANNEL_ID)
+    asyncio.create_task(clear(ctx, amount))
+
+def stopConversation():
+    global startConvo
+    print("Conversa encerrada por solicitação do usuário.")
+    startConvo = False
+    count.cancel()
+
+## Bot tools end
+
+## Discord commands
 
 @client.event
 @commands.has_permissions(kick_members=True)
@@ -49,13 +83,8 @@ async def kick(guild_id, requesting_user:int, target_id, confirmation):
     requesting_member = guild.get_member(requesting_user)
     print("Nome do usuário a ser banido: ", target_member)
     print("Nome do usuário solicitando banimento: ", requesting_member)
-    print(requesting_member.guild_permissions)
-    
-
-def createTextChannel(server_id:int, nome_canal:str):
-    print(f"Criou canal {nome_canal}, no servidor de id {server_id}")
-    print(server_id)
-    asyncio.create_task(textChannelCreate(int(server_id), nome_canal))
+    print(requesting_member.guild_permissions.kick_members)
+    # add kick functionality    
 
 @client.event
 async def textChannelCreate(id, name):
@@ -63,19 +92,11 @@ async def textChannelCreate(id, name):
     print(guild)
     await guild.create_text_channel(name)
 
-def deleteTextChannel(channel_id:int):
-    print(channel_id)
-    asyncio.create_task(textChannelDelete(int(channel_id)))
-
 @client.event
 async def textChannelDelete(id):
     channel = client.get_channel(id)
     print(channel)
     await channel.delete()
-
-def clearMsgs(amount:int=5):
-    ctx = client.get_channel(CHANNEL_ID)
-    asyncio.create_task(clear(ctx, amount))
 
 @client.command()
 async def clear(ctx, amount):
@@ -83,8 +104,9 @@ async def clear(ctx, amount):
     amount+=1
     await ctx.purge(limit=int(amount))
 
-def stopTalking():
-    stopConvo()
+## Discord commands end
+
+## Conversation timer
 
 def startConvoTimer():
     count.start()
@@ -92,11 +114,12 @@ def startConvoTimer():
 def resetConvoTimer():
     count.restart()
 
-def stopConvo():
+
+""" def stopConvo():
     global startConvo
-    print("conversa paro pq o usuario quis")
+    print("Conversa encerrada por solicitação do usuário.")
     startConvo = False
-    count.cancel()
+    count.cancel() """
 
 @tasks.loop(seconds=30.0, count=2)
 async def count():
@@ -105,25 +128,19 @@ async def count():
     
     global startConvo
     global CHANNEL_ID
-    print("clebinho bot n escuta mais")
+    print("O bot não está mais escutando.")
     startConvo = False
     CHANNEL_ID = 0
     count.cancel()
 
+## Conversation timer end
+
+## Gemini API initialization
+
 model = genai.Client(api_key=GOOGLE_API_KEY)
 
-""" model = genai.generativeModel(
-    'gemini-3.6-flash',
-    safety_settings={
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH
-    },
-    tools=[clearMsgs, createTextChannel, deleteTextChannel, kickUser, stopTalking]) """
-#chat = model.start_chat(history=[], enable_automatic_function_calling=True)
 chat = model.chats.create(
-    model="gemini-3.6-flash",
+    model=MODEL,
     config=types.GenerateContentConfig(
         safety_settings=[
             types.SafetySetting(
@@ -142,15 +159,19 @@ chat = model.chats.create(
                 category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
                 threshold=types.HarmBlockThreshold.OFF
             ),
-        ]
-    ),
+        ],
+        tools=[clearMsgs, createTextChannel, deleteTextChannel, kickUser, stopConversation]
+    ),    
     history=[],
 )
-bot_instructions = "Seu nome é Cleber, você é um bot do Discord, você foi feito apenas para conversar com as pessoas, então responda-as num linguajar mais xulo e casual, usando gírias e palavrões (NA MEDIDA). Evite disseminar ódio gratuito e discursos de ódio."
+
+## Gemini API initialization end
+
+## Main bot loop
 
 @client.event
 async def on_message(message):
-    global bot_instructions
+    global BOT_INSTRUCTIONS
     global startConvo
     global CHANNEL_ID
     if message.author == client.user:
@@ -167,15 +188,14 @@ async def on_message(message):
 
     if startConvo == True and message.channel.id == CHANNEL_ID:
         resetConvoTimer()
-        async with message.channel.typing():
+        async with message.channel.typing():            
             informations = f"O nome da pessoa que mandou mensagem agora é '{message.author.name}', seu id é '{message.author.id}', esse servidor tem o id '{message.guild.id}'. Ao responder a mensagem, ignore tudo isso, use essas informações apenas para comandos específicos, não para respostas."
             print(informations)
             print("-"*80)
             # AI response
-            response = chat.send_message(bot_instructions + informations + message.content)                
+            response = chat.send_message(BOT_INSTRUCTIONS + informations + message.content)                
             channel = client.get_channel(CHANNEL_ID)        
-            bot_instructions = ""
-            print(response)
+            BOT_INSTRUCTIONS = ""
             if response.prompt_feedback != None:
                 print(response.prompt_feedback)
                 response.prompt_feedback
