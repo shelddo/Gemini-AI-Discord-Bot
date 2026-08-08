@@ -41,11 +41,16 @@ async def on_ready():
 
 ## Bot tools (commands that the bot can execute)
 
-def kickUser(guild_id:int, requesting_user:int, target_id:int, really:bool=False):
-    if really == False:
-        return "Para continuar, necessário que o úsuario que solicitou confirme a operação, pergunte se ele tem certeza e execute o comando."
+def kickUser(guild_id:int, requesting_user:int, target_id:int, confirmation:bool=False):   
+    guild = client.get_guild(guild_id)
+    reqUser = guild.get_member(requesting_user)
+    if reqUser.guild_permissions.kick_members:        
+        if confirmation == False:
+            return "Para continuar, necessário que o úsuario que solicitou confirme a operação, pergunte se ele tem certeza e execute o comando."
+        else:
+            asyncio.create_task(kick(int(guild_id), int(requesting_user), int(target_id), confirmation))
     else:
-        asyncio.create_task(kick(int(guild_id), int(requesting_user), int(target_id), really))
+        return "O usuário que solicitou não tem permissão para kickar membros."
 
 def deleteTextChannel(channel_id:int):
     print(channel_id)
@@ -56,9 +61,14 @@ def createTextChannel(server_id:int, nome_canal:str):
     print(server_id)
     asyncio.create_task(textChannelCreate(int(server_id), nome_canal))
 
-def clearMsgs(amount:int=5):
-    ctx = client.get_channel(CHANNEL_ID)
-    asyncio.create_task(clear(ctx, amount))
+def clearMsgs(user_id:int, guild_id:int, amount:int=5):
+    guild = client.get_guild(guild_id)
+    reqUser = guild.get_member(user_id)
+    if reqUser.guild_permissions.manage_messages:
+        ctx = client.get_channel(CHANNEL_ID)
+        asyncio.create_task(clear(ctx, amount))
+    else:
+        return "O usuário que solicitou não tem permissão para apagar mensagens."
 
 def stopConversation():
     global startConvo
@@ -70,6 +80,7 @@ def stopConversation():
 
 ## Discord commands
 
+# KICK COMMAND
 @client.event
 @commands.has_permissions(kick_members=True)
 async def kick(guild_id, requesting_user:int, target_id, confirmation):
@@ -83,26 +94,29 @@ async def kick(guild_id, requesting_user:int, target_id, confirmation):
     requesting_member = guild.get_member(requesting_user)
     print("Nome do usuário a ser banido: ", target_member)
     print("Nome do usuário solicitando banimento: ", requesting_member)
-    print(requesting_member.guild_permissions.kick_members)
-    # add kick functionality    
+    print(requesting_member.guild_permissions.kick_members)   
+    await target_member.kick()
 
+# CREATE TEXT CHANNEL COMMAND
 @client.event
 async def textChannelCreate(id, name):
     guild = client.get_guild(id)
     print(guild)
     await guild.create_text_channel(name)
 
+# DELETE TEXT CHANNEL COMMAND
 @client.event
 async def textChannelDelete(id):
     channel = client.get_channel(id)
     print(channel)
     await channel.delete()
 
+#CLEAR MESSAGES COMMAND
 @client.command()
 async def clear(ctx, amount):
-    print("ctx: ", ctx)
     amount+=1
     await ctx.purge(limit=int(amount))
+    return "Mensagens apagadas com sucesso."
 
 ## Discord commands end
 
@@ -113,13 +127,6 @@ def startConvoTimer():
 
 def resetConvoTimer():
     count.restart()
-
-
-""" def stopConvo():
-    global startConvo
-    print("Conversa encerrada por solicitação do usuário.")
-    startConvo = False
-    count.cancel() """
 
 @tasks.loop(seconds=30.0, count=2)
 async def count():
@@ -188,7 +195,8 @@ async def on_message(message):
 
     if startConvo == True and message.channel.id == CHANNEL_ID:
         resetConvoTimer()
-        async with message.channel.typing():            
+        async with message.channel.typing():     
+            # Bot necessary informations to use in commands       
             informations = f"O nome da pessoa que mandou mensagem agora é '{message.author.name}', seu id é '{message.author.id}', esse servidor tem o id '{message.guild.id}'. Ao responder a mensagem, ignore tudo isso, use essas informações apenas para comandos específicos, não para respostas."
             print(informations)
             print("-"*80)
